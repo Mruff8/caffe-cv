@@ -40,6 +40,53 @@ export async function login(prevState, formData) {
 }
 
 /**
+ * Server Action untuk mengganti password admin yang sedang login.
+ */
+export async function gantiPassword(prevState, formData) {
+  const data = formData instanceof FormData ? formData : prevState;
+  const passwordBaru = data.get("password_baru");
+  const konfirmasiPassword = data.get("konfirmasi_password");
+
+  if (!passwordBaru || !konfirmasiPassword) {
+    return { error: "Semua kolom password wajib diisi." };
+  }
+
+  if (passwordBaru.length < 8) {
+    return { error: "Password baru minimal 8 karakter." };
+  }
+
+  if (passwordBaru !== konfirmasiPassword) {
+    return { error: "Konfirmasi password tidak sama dengan password baru." };
+  }
+
+  let supabase;
+  try {
+    supabase = await buatKlienSesiAdmin();
+  } catch (err) {
+    return { error: err.message || "Gagal menginisialisasi sesi." };
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { error: "Sesi login tidak ditemukan atau kedaluwarsa. Silakan masuk kembali." };
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: passwordBaru,
+  });
+
+  if (error) {
+    return { error: error.message || "Gagal mengganti password." };
+  }
+
+  return { success: "Password berhasil diganti." };
+}
+
+/**
  * Server Action untuk mengakhiri sesi admin (logout) lalu kembali ke halaman login.
  */
 export async function keluar() {
@@ -54,4 +101,3 @@ export async function keluar() {
 }
 
 export const logout = keluar;
-
