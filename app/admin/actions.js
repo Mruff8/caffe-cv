@@ -4,6 +4,27 @@ import { redirect } from "next/navigation";
 import { buatKlienSesiAdmin } from "@/lib/supabase/server";
 
 /**
+ * Memeriksa apakah admin saat ini sedang login di server.
+ * Mengembalikan objek user jika valid, atau null jika tidak login.
+ */
+export async function periksaLoginAdmin() {
+  try {
+    const supabase = await buatKlienSesiAdmin();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      return null;
+    }
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Server Action untuk memproses login admin menggunakan Supabase Auth.
  */
 export async function login(prevState, formData) {
@@ -41,6 +62,7 @@ export async function login(prevState, formData) {
 
 /**
  * Server Action untuk mengganti password admin yang sedang login.
+ * Memeriksa login di server terlebih dahulu sebelum melakukan perubahan data.
  */
 export async function gantiPassword(prevState, formData) {
   const data = formData instanceof FormData ? formData : prevState;
@@ -59,20 +81,17 @@ export async function gantiPassword(prevState, formData) {
     return { error: "Konfirmasi password tidak sama dengan password baru." };
   }
 
+  // Wajib periksa login di server sebelum mengubah data (aturan keamanan no. 3)
+  const user = await periksaLoginAdmin();
+  if (!user) {
+    return { error: "Sesi login tidak ditemukan atau kedaluwarsa. Silakan masuk kembali." };
+  }
+
   let supabase;
   try {
     supabase = await buatKlienSesiAdmin();
   } catch (err) {
     return { error: err.message || "Gagal menginisialisasi sesi." };
-  }
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { error: "Sesi login tidak ditemukan atau kedaluwarsa. Silakan masuk kembali." };
   }
 
   const { error } = await supabase.auth.updateUser({
