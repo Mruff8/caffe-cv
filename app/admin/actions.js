@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { buatKlienSesiAdmin } from "@/lib/supabase/server";
 
 /**
@@ -103,6 +104,129 @@ export async function gantiPassword(prevState, formData) {
   }
 
   return { success: "Password berhasil diganti." };
+}
+
+/**
+ * Server Action untuk menambah produk baru ke tabel "produk".
+ * Memeriksa login admin di server sebelum menyimpan data.
+ */
+export async function tambahProduk(prevState, formData) {
+  const data = formData instanceof FormData ? formData : prevState;
+
+  // Wajib periksa login di server sebelum menambah data (aturan keamanan no. 3)
+  const user = await periksaLoginAdmin();
+  if (!user) {
+    return { error: "Sesi login tidak ditemukan atau kedaluwarsa. Silakan masuk kembali." };
+  }
+
+  const nama = data.get("nama")?.toString().trim();
+  const hargaRaw = data.get("harga");
+  const kategori = data.get("kategori")?.toString().trim() || null;
+  const fotoUrl = data.get("foto_url")?.toString().trim() || null;
+  const deskripsi = data.get("deskripsi")?.toString().trim() || null;
+
+  if (!nama) {
+    return { error: "Nama produk wajib diisi." };
+  }
+
+  if (hargaRaw === null || hargaRaw === undefined || hargaRaw === "") {
+    return { error: "Harga produk wajib diisi." };
+  }
+
+  const harga = Number(hargaRaw);
+  if (isNaN(harga) || harga < 0) {
+    return { error: "Harga produk harus berupa angka positif atau nol." };
+  }
+
+  let insertError;
+  try {
+    const supabase = await buatKlienSesiAdmin();
+    const { error } = await supabase.from("produk").insert([
+      {
+        nama,
+        harga: Math.round(harga),
+        kategori,
+        foto_url: fotoUrl,
+        deskripsi,
+      },
+    ]);
+    insertError = error;
+  } catch (err) {
+    return { error: err.message || "Terjadi kesalahan saat menyimpan produk." };
+  }
+
+  if (insertError) {
+    return { error: insertError.message || "Gagal menyimpan produk ke database." };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+  redirect("/admin?pesan=sukses_tambah");
+}
+
+/**
+ * Server Action untuk memperbarui (mengubah) produk yang sudah ada di tabel "produk".
+ * Memeriksa login admin di server sebelum menyimpan perubahan.
+ */
+export async function ubahProduk(prevState, formData) {
+  const data = formData instanceof FormData ? formData : prevState;
+
+  // Wajib periksa login di server sebelum mengubah data (aturan keamanan no. 3)
+  const user = await periksaLoginAdmin();
+  if (!user) {
+    return { error: "Sesi login tidak ditemukan atau kedaluwarsa. Silakan masuk kembali." };
+  }
+
+  const id = data.get("id");
+  if (!id) {
+    return { error: "ID produk tidak valid atau tidak ditemukan." };
+  }
+
+  const nama = data.get("nama")?.toString().trim();
+  const hargaRaw = data.get("harga");
+  const kategori = data.get("kategori")?.toString().trim() || null;
+  const fotoUrl = data.get("foto_url")?.toString().trim() || null;
+  const deskripsi = data.get("deskripsi")?.toString().trim() || null;
+
+  if (!nama) {
+    return { error: "Nama produk wajib diisi." };
+  }
+
+  if (hargaRaw === null || hargaRaw === undefined || hargaRaw === "") {
+    return { error: "Harga produk wajib diisi." };
+  }
+
+  const harga = Number(hargaRaw);
+  if (isNaN(harga) || harga < 0) {
+    return { error: "Harga produk harus berupa angka positif atau nol." };
+  }
+
+  let updateError;
+  try {
+    const supabase = await buatKlienSesiAdmin();
+    const { error } = await supabase
+      .from("produk")
+      .update({
+        nama,
+        harga: Math.round(harga),
+        kategori,
+        foto_url: fotoUrl,
+        deskripsi,
+      })
+      .eq("id", id);
+    updateError = error;
+  } catch (err) {
+    return { error: err.message || "Terjadi kesalahan saat memperbarui produk." };
+  }
+
+  if (updateError) {
+    return { error: updateError.message || "Gagal memperbarui produk di database." };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(`/produk/${id}`);
+  revalidatePath("/");
+  redirect("/admin?pesan=sukses_ubah");
 }
 
 /**
