@@ -64,6 +64,12 @@ export default async function HalamanAdmin({ searchParams }) {
         </div>
       )}
 
+      {pesan === "sukses_hapus" && (
+        <div className="rounded-xl border border-garis bg-permukaan p-4 text-sm font-medium text-utama">
+          Produk berhasil dihapus.
+        </div>
+      )}
+
       {errorPesan ? (
         <div className="rounded-xl border border-garis bg-permukaan p-4 text-bahaya">
           <p className="font-semibold">Gagal memuat produk</p>

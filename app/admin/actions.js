@@ -230,6 +230,46 @@ export async function ubahProduk(prevState, formData) {
 }
 
 /**
+ * Server Action untuk menghapus produk dari database.
+ * Memeriksa login admin di server sebelum melakukan penghapusan data.
+ */
+export async function hapusProduk(idOrFormData) {
+  let id;
+  if (idOrFormData instanceof FormData) {
+    id = idOrFormData.get("id");
+  } else {
+    id = idOrFormData;
+  }
+
+  if (!id) {
+    return { error: "ID produk tidak valid atau tidak ditemukan." };
+  }
+
+  // Wajib periksa login di server sebelum menghapus data (aturan keamanan no. 3)
+  const user = await periksaLoginAdmin();
+  if (!user) {
+    return { error: "Sesi login tidak ditemukan atau kedaluwarsa. Silakan masuk kembali." };
+  }
+
+  let deleteError;
+  try {
+    const supabase = await buatKlienSesiAdmin();
+    const { error } = await supabase.from("produk").delete().eq("id", id);
+    deleteError = error;
+  } catch (err) {
+    return { error: err.message || "Terjadi kesalahan saat menghapus produk." };
+  }
+
+  if (deleteError) {
+    return { error: deleteError.message || "Gagal menghapus produk dari database." };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/");
+  redirect("/admin?pesan=sukses_hapus");
+}
+
+/**
  * Server Action untuk mengakhiri sesi admin (logout) lalu kembali ke halaman login.
  */
 export async function keluar() {
